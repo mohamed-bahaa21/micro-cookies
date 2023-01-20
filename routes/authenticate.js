@@ -9,10 +9,13 @@ passport.deserializeUser((user, done) => {
     done(null, user);
 })
 
+let local_callback = "http://localhost:3000/google/callback"
+let heroku_callback = 'https://micro-cookies.herokuapp.com/google/callback'
+
 passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: "http://localhost:3000/google/callback"
+    callbackURL: heroku_callback
 },
     function (accessToken, refreshToken, profile, cb) {
         // Register user here.
