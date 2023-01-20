@@ -6,7 +6,7 @@ const moment = require('moment');
 // const mdq = require('mongo-date-query');
 const json2csv = require('json2csv').parse;
 const path = require('path')
-const fields = ['stationID', 'sessionStartTime', 'sessionEndTime', 'cookieCount'];
+const fields = ['stationID', 'sessionStartTime', 'sessionEndTime', 'cookiesCount'];
 
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
@@ -16,36 +16,8 @@ require('./authenticate');
 
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 router.get('/google/callback', passport.authenticate('google', { failureRedirect: '/' }), (req, res) => {
-  //res.redirect('/');
   res.redirect('/profile')
 })
-
-// /* google passport strategy. */
-// passport.use(new GoogleStrategy({
-//   clientID: process.env.GOOGLE_CLIENT_ID,
-//   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-//   callbackURL: `http://localhost:3000/google/callback`
-// },
-//   function (accessToken, refreshToken, profile, cb) {
-//     // Save the user's information to your database
-//     // and create a session for the user
-//     // req.session.adminLogged = true;
-//     console.log(profile);
-//     cb(null, profile);
-//   },
-// ));
-
-// /* GET google signin callback. */
-// // router.get('/signin', passport.authenticate('google', { scope: ['profile'] }));
-// router.get('/google', passport.authenticate('google', { scope: ['profile'] }));
-
-// /* GET admin login. */
-// router.get('/google/callback',
-//   passport.authenticate('google', { failureRedirect: '/' }),
-//   function (req, res) {
-//     // Successful authentication, redirect to the home page
-//     res.redirect('/profile');
-//   });
 
 passport.serializeUser((user, done) => {
   done(null, user.id);
@@ -89,35 +61,31 @@ router.get('/logout', ensureAuthenticated, function (req, res) {
 
 /* GET export csv. */
 router.get('/exports/csv', ensureAuthenticated, function (req, res) {
-  WSession.find().then((err, students) => {
-    if (err) {
+  WSession.find().then((sessions) => {
+    let csv
+    try {
+      csv = json2csv(sessions, { fields });
+    } catch (err) {
       return res.status(500).json({ err });
     }
-    else {
-      let csv
-      try {
-        csv = json2csv(students, { fields });
-      } catch (err) {
-        return res.status(500).json({ err });
+    const dateTime = moment().format('YYYYMMDDhhmmss');
+    const filePath = path.join(__dirname, "..", "public", "exports", "csv-" + dateTime + ".csv")
+    console.log('====================================');
+    console.log(filePath);
+    console.log('====================================');
+    fs.writeFile(filePath, csv, function (err) {
+      if (err) {
+        return res.json(err).status(500);
       }
-      const dateTime = moment().format('YYYYMMDDhhmmss');
-      const filePath = path.join("..", "public", "exports", "csv-" + dateTime + ".csv")
-      console.log('====================================');
-      console.log(filePath);
-      console.log('====================================');
-      fs.writeFile(filePath, csv, function (err) {
-        if (err) {
-          return res.json(err).status(500);
-        }
-        else {
-          setTimeout(function () {
-            fs.unlinkSync(filePath); // delete this file after 30 seconds
-          }, 30000)
-          return res.json("/exports/csv-" + dateTime + ".csv");
-        }
-      });
+      else {
+        setTimeout(function () {
+          fs.unlinkSync(filePath); // delete this file after 30 seconds
+        }, 30000)
+        return res.json("/exports/csv-" + dateTime + ".csv");
+      }
+    });
 
-    }
+    // }
   })
 })
 
