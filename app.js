@@ -1,5 +1,6 @@
 const dotenv = require('dotenv');
 dotenv.config({ silent: true });
+const fs = require('fs');
 var createError = require('http-errors');
 var express = require('express');
 var path = require('path');
@@ -16,6 +17,7 @@ mongoose.connect(process.env.MONGODB_URI, {
 });
 
 var indexRouter = require('./routes/index');
+const { env } = require('process');
 
 var app = express();
 
@@ -23,7 +25,11 @@ var app = express();
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
 
-app.use(logger('dev'));
+if (process.env.ENVIRONMENT == 'production') {
+  app.use(logger('common', { stream: fs.createWriteStream('./logs/common.log', { flags: 'a' }) }));
+} else {
+  app.use(morgan('dev'));
+}
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());

@@ -4,7 +4,8 @@ const mongoose = require('mongoose');
 const WSessionSchema = new mongoose.Schema({
   stationID: {
     type: String,
-    required: true
+    required: true,
+    unique: true
   },
   cookiesCount: {
     type: Number,

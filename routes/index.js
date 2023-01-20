@@ -70,9 +70,6 @@ router.get('/exports/csv', ensureAuthenticated, function (req, res) {
     }
     const dateTime = moment().format('YYYYMMDDhhmmss');
     const filePath = path.join(__dirname, "..", "public", "exports", "csv-" + dateTime + ".csv")
-    console.log('====================================');
-    console.log(filePath);
-    console.log('====================================');
     fs.writeFile(filePath, csv, function (err) {
       if (err) {
         return res.json(err).status(500);
@@ -89,66 +86,84 @@ router.get('/exports/csv', ensureAuthenticated, function (req, res) {
   })
 })
 
-/* GET verify controller. */
-router.get('/api/create_session', function (req, res, next) {
-  let current_stationID = req.body.stationID || req.headers['stationID']
-  WSession.count({}, function (err, count) {
-    current_stationID = count + 1
-  })
+function check_private_key(req, res, next) {
+  let private_key = req.body.private_key
+  if (private_key !== process.env.RSA_ENC) {
+    return
+  } else {
+    next();
+  }
+}
 
-  // if (req.params.private_key == "123") {
-  let newSession = new WSession({
-    stationID: `${current_stationID}`,
-    cookiesCount: 0,
-    sessionStartTime: Date.now(),
-    sessionEndTime: Date.now(),
-  })
-  newSession.save()
+/* GET create or stop the session. */
+router.get('/api/trigger_session', function (req, res, next) {
+  check_private_key(req, res, next)
 
-    .then((err) => {
-      req.session.workingSession = newSession;
-      res.send("New session created.")
-    }).catch(err => {
-      res.send('error creating new session.')
-    })
+  let current_stationID = req.body.stationID || req.headers['stationID'] || req.params.stationID
+  if(!current_stationID) res.json({msg: "No stationID was found."})
 
-  // } else {
-  //   res.send('private_key unmatched.')
-  // }
+  WSession.findOne({ stationID: `${current_stationID}` }, function (err, session) {
+    // if (err) return next(err);
+
+    // for development
+    if (process.env.ENVIRONMENT == "development") {
+      if (!current_stationID || current_stationID == undefined || typeof current_stationID != String) {
+        WSession.count({}, function (err, count) {
+          current_stationID = count + 1
+        })
+      }
+    }
+
+    if (!session) {
+      let newSession = new WSession({
+        stationID: `${current_stationID}`,
+        cookiesCount: 0,
+        sessionStartTime: Date.now(),
+        sessionEndTime: Date.now(),
+      })
+
+      newSession.save()
+        .then((result) => {
+          console.log("New session created.")
+          res.json({ msg: 'New session created.', current_stationID })
+        })
+
+    } else {
+      session.sessionEndTime = Date.now()
+      session.save()
+        .then(err => {
+          // if(err) return res.send(err)
+          console.log('closed session ', current_stationID)
+          res.json({ msg: 'Closed the session.', current_stationID })
+        })
+    }
+  });
 });
 
 /* POST add a new cookie. */
 router.get('/api/add_cookie', function (req, res, next) {
-  let current_stationID = req.body.stationID || req.headers['stationID'] || '1'
-  let newCookiesCount;
-  if (!req.session.workingSession) {
-    WSession.findOne({ stationID: current_stationID }).then(wsession => {
-      newCookiesCount = wsession.cookiesCount + 1;
-      wsession.cookiesCount = newCookiesCount;
+  check_private_key(req, res, next)
 
-      wsession.save().then((err, result) => {
-        if (err) {
-          res.send(err)
-        } else {
-          res.send('cookie was added to ', current_stationID);
-        }
-      })
+  let current_stationID = req.body.stationID || req.headers['stationID'] || req.params.stationID
+  if (!current_stationID) res.redirect('/')
 
+  WSession.findOne({ stationID: current_stationID }).then(wsession => {
+    if (!wsession) res.send('no stationID could be found')
+    let newCookiesCount = wsession.cookiesCount + 1;
+    wsession.cookiesCount = newCookiesCount;
+
+    wsession.save().then((err, result) => {
+      res.json({ msg: 'added a new cookie.' })
     })
-  } else {
-    newCookiesCount = req.session.workingSession.cookiesCount + 1;
+  })
 
-    WSession.findOneAndUpdate({ stationID: current_stationID }, { cookiesCount: newCookiesCount })
-      .then((err) => {
-        if (err) res.send("error adding a cookie")
-        res.send('cookie was added to ', current_stationID);
-      })
-  }
 });
 
 /* POST close session. */
 router.get('/api/close_session', function (req, res, next) {
-  let current_stationID = req.body.stationID || req.headers['stationID'] || '1'
+  check_private_key(req, res), next;
+
+  let current_stationID = req.body.stationID || req.headers['stationID'] || req.params.stationID
   WSession.findOneAndUpdate({ stationID: current_stationID }, { sessionEndTime: Date.now() })
     .then(err => {
       if (err) return res.send(err)
