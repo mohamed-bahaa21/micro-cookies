@@ -14,11 +14,13 @@ const WSessionSchema = new mongoose.Schema({
   },
   sessionStartTime: {
     type: Date,
-    required: false
+    required: true,
+    default: Date.now()
   },
   sessionEndTime: {
     type: Date,
-    required: false
+    required: false,
+    default: undefined
   },
 }, {
   timestamps: true

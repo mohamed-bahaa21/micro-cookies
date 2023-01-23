@@ -78,7 +78,7 @@ router.get('/exports/csv', ensureAuthenticated, function (req, res) {
         setTimeout(function () {
           fs.unlinkSync(filePath); // delete this file after 30 seconds
         }, 30000)
-        return res.json("/exports/csv-" + dateTime + ".csv");
+        return res.redirect("/exports/csv-" + dateTime + ".csv");
       }
     });
 
@@ -89,89 +89,125 @@ router.get('/exports/csv', ensureAuthenticated, function (req, res) {
 function check_private_key(req, res, next) {
   let private_key = req.body.private_key
   if (private_key !== process.env.RSA_ENC) {
-    return
+    console.log('here1');
+    return res.json({ msg: "Please, Make sure the private_key is valid." })
   } else {
-    next();
+    console.log('here2');
+    return;
+  }
+}
+
+function development_current_stationID(current_stationID) {
+  // for development
+  if (process.env.ENVIRONMENT == "development") {
+    if (!current_stationID || current_stationID == undefined || typeof current_stationID != String) {
+      WSession.count({}, function (err, count) {
+        let new_current_stationID = count + 1
+        return new_current_stationID;
+      })
+    }
   }
 }
 
 /* GET create or stop the session. */
-router.get('/api/trigger_session', function (req, res, next) {
+router.get('/api/trigger_session', async function (req, res, next) {
+  // console.log(req.body);
   check_private_key(req, res, next)
 
   let current_stationID = req.body.stationID || req.headers['stationID'] || req.params.stationID
-  if(!current_stationID) res.json({msg: "No stationID was found."})
+  if (current_stationID == undefined) res.json({ msg: "Please send the stationID." })
 
-  WSession.findOne({ stationID: `${current_stationID}` }, function (err, session) {
-    // if (err) return next(err);
+  let find_session = await WSession.findOne({ stationID: `${current_stationID}` });
 
-    // for development
-    if (process.env.ENVIRONMENT == "development") {
-      if (!current_stationID || current_stationID == undefined || typeof current_stationID != String) {
-        WSession.count({}, function (err, count) {
-          current_stationID = count + 1
-        })
-      }
+  // for development
+  development_current_stationID(current_stationID)
+
+  // case: no session was found with that ID
+  if (!find_session) {
+    let newSession = new WSession({
+      stationID: `${current_stationID}`,
+      cookiesCount: 0,
+      sessionStartTime: Date.now(),
+      sessionEndTime: undefined,
+    })
+
+    let save_newSession = await newSession.save();
+    if (save_newSession) return res.status(200).json({ msg: 'New session created.', current_stationID })
+  }
+
+  // case: session was found with that ID
+  if (find_session) {
+    // case: session end time was undefined
+    if (find_session.sessionEndTime == undefined) {
+      find_session.sessionEndTime = Date.now()
+      let save_currentSession = await find_session.save()
+      if (save_currentSession) return res.json({ msg: 'Closed the session.', current_stationID })
     }
 
-    if (!session) {
-      let newSession = new WSession({
-        stationID: `${current_stationID}`,
-        cookiesCount: 0,
-        sessionStartTime: Date.now(),
-        sessionEndTime: Date.now(),
-      })
-
-      newSession.save()
-        .then((result) => {
-          console.log("New session created.")
-          res.json({ msg: 'New session created.', current_stationID })
-        })
-
-    } else {
-      session.sessionEndTime = Date.now()
-      session.save()
-        .then(err => {
-          // if(err) return res.send(err)
-          console.log('closed session ', current_stationID)
-          res.json({ msg: 'Closed the session.', current_stationID })
-        })
+    // case: session end time was updated before
+    if (find_session.sessionEndTime != undefined) {
+      return res.json({ msg: 'We found data with the same stationID and has been closed. Should we create another session with the same ID, Or update the sessionEndTime.' })
     }
-  });
+  }
+
 });
 
 /* POST add a new cookie. */
-router.get('/api/add_cookie', function (req, res, next) {
+router.get('/api/add_cookie', async function (req, res, next) {
   check_private_key(req, res, next)
 
   let current_stationID = req.body.stationID || req.headers['stationID'] || req.params.stationID
-  if (!current_stationID) res.redirect('/')
+  if (current_stationID == undefined) res.json({ msg: "Please send the stationID." })
 
-  WSession.findOne({ stationID: current_stationID }).then(wsession => {
-    if (!wsession) res.send('no stationID could be found')
-    let newCookiesCount = wsession.cookiesCount + 1;
-    wsession.cookiesCount = newCookiesCount;
+  // for development
+  development_current_stationID(current_stationID)
 
-    wsession.save().then((err, result) => {
-      res.json({ msg: 'added a new cookie.' })
+  let find_session = await WSession.findOne({ stationID: `${current_stationID}` });
+
+  // case: no session was found with that ID
+  if (!find_session) {
+    let newSession = new WSession({
+      stationID: `${current_stationID}`,
+      cookiesCount: 1,
+      sessionStartTime: Date.now(),
+      sessionEndTime: undefined,
     })
-  })
+
+    let save_newSession = await newSession.save();
+    if (save_newSession) return res.status(200).json({ msg: 'New session created, and one cookie was added.', current_stationID })
+  }
+
+  // case: session was found with that ID
+  if (find_session) {
+    // case: session end time was undefined
+    if (find_session.sessionEndTime == undefined) {
+      find_session.cookiesCount += 1;
+
+      let save_currentSession = await find_session.save()
+      if (save_currentSession) return res.json({ msg: 'Added a new cookie.', current_stationID })
+    }
+
+    // case: session end time was updated before
+    if (find_session.sessionEndTime !== undefined) {
+      return res.json({ msg: "You can't add new cookies. This session was closed" })
+    }
+  }
 
 });
 
 /* POST close session. */
-router.get('/api/close_session', function (req, res, next) {
-  check_private_key(req, res), next;
+// router.get('/api/close_session', function (req, res, next) {
+//   check_private_key(req, res), next;
 
-  let current_stationID = req.body.stationID || req.headers['stationID'] || req.params.stationID
-  WSession.findOneAndUpdate({ stationID: current_stationID }, { sessionEndTime: Date.now() })
-    .then(err => {
-      if (err) return res.send(err)
-      res.send('cookie was added to ', current_stationID);
-    })
-    .catch(err => {
-      res.send(err)
-    })
-});
+//   let current_stationID = req.body.stationID || req.headers['stationID'] || req.params.stationID
+//   WSession.findOneAndUpdate({ stationID: current_stationID }, { sessionEndTime: Date.now() })
+//     .then(err => {
+//       if (err) return res.send(err)
+//       res.send('cookie was added to ', current_stationID);
+//     })
+//     .catch(err => {
+//       res.send(err)
+//     })
+// });
 
 module.exports = router;
