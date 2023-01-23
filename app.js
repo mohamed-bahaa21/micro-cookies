@@ -43,7 +43,7 @@ app.use(session({
 }));
 // Passport middleware
 app.use(passport.initialize());
-// app.use(passport.session());
+app.use(passport.session());
 
 var indexRouter = require('./routes/index');
 app.use('/', indexRouter);

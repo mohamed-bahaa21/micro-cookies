@@ -14,10 +14,15 @@ const WSession = require('../models/WSession.model');
 
 require('./authenticate');
 
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
-router.get('/google/callback', passport.authenticate('google', { failureRedirect: '/' }), (req, res) => {
-  res.redirect('/profile')
-})
+router.get('/google',
+  passport.authenticate('google', { scope: ['profile', 'email'] })
+);
+router.get('/google/callback',
+  passport.authenticate('google', { failureRedirect: '/' }),
+  (req, res) => {
+    res.redirect('/profile')
+  }
+)
 
 passport.serializeUser((user, done) => {
   done(null, user.id);
@@ -111,10 +116,10 @@ function development_current_stationID(current_stationID) {
 
 /* GET create or stop the session. */
 router.get('/api/trigger_session', async function (req, res, next) {
-  if(!req.body.private_key || !req.body.stationID) return res.send({ msg: "Unautherized." })
+  if (!req.body.private_key || !req.body.stationID) return res.send({ msg: "Unautherized." })
   // console.log(req.body);
   let checky = check_private_key(req, res, next)
-  if(!checky) return res.send({ msg: "Please, Make sure the private_key is valid." });
+  if (!checky) return res.send({ msg: "Please, Make sure the private_key is valid." });
 
   let current_stationID = req.body.stationID || req.headers['stationID'] || req.params.stationID
   if (current_stationID == undefined) res.json({ msg: "Please send the stationID." })
@@ -156,10 +161,10 @@ router.get('/api/trigger_session', async function (req, res, next) {
 
 /* POST add a new cookie. */
 router.get('/api/add_cookie', async function (req, res, next) {
-  if(!req.body.private_key || !req.body.stationID) return res.send({ msg: "Unautherized." })
+  if (!req.body.private_key || !req.body.stationID) return res.send({ msg: "Unautherized." })
   // console.log(req.body);
   let checky = check_private_key(req, res, next)
-  if(!checky) return res.send({ msg: "Please, Make sure the private_key is valid." });
+  if (!checky) return res.send({ msg: "Please, Make sure the private_key is valid." });
 
   let current_stationID = req.body.stationID || req.headers['stationID'] || req.params.stationID
   if (current_stationID == undefined) res.json({ msg: "Please send the stationID." })
