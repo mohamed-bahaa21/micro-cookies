@@ -5,7 +5,7 @@ const WSessionSchema = new mongoose.Schema({
   stationID: {
     type: String,
     required: true,
-    unique: true
+    unique: false
   },
   cookiesCount: {
     type: Number,

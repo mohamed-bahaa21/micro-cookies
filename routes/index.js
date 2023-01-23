@@ -124,7 +124,7 @@ router.get('/api/trigger_session', async function (req, res, next) {
   let current_stationID = req.body.stationID || req.headers['stationID'] || req.params.stationID
   if (current_stationID == undefined) res.json({ msg: "Please send the stationID." })
 
-  let find_session = await WSession.findOne({ stationID: `${current_stationID}` });
+  let find_session = await WSession.findOne({ stationID: `${current_stationID}`, sessionEndTime: undefined });
 
   // for development
   development_current_stationID(current_stationID)
@@ -153,7 +153,15 @@ router.get('/api/trigger_session', async function (req, res, next) {
 
     // case: session end time was updated before
     if (find_session.sessionEndTime != undefined) {
-      return res.json({ msg: 'We found data with the same stationID and has been closed. Should we create another session with the same ID, Or update the sessionEndTime.' })
+      let newSession = new WSession({
+        stationID: `${current_stationID}`,
+        cookiesCount: 0,
+        sessionStartTime: Date.now(),
+        sessionEndTime: undefined,
+      })
+
+      let save_newSession = await newSession.save();
+      if (save_newSession) return res.status(200).json({ msg: 'Session with identical stationID was closed before, So new session is created.', current_stationID })
     }
   }
 
