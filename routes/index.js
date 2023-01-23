@@ -90,10 +90,10 @@ function check_private_key(req, res, next) {
   let private_key = req.body.private_key
   if (private_key !== process.env.RSA_ENC) {
     console.log('here1');
-    return res.json({ msg: "Please, Make sure the private_key is valid." })
+    return false;
   } else {
     console.log('here2');
-    return;
+    return true;
   }
 }
 
@@ -111,8 +111,10 @@ function development_current_stationID(current_stationID) {
 
 /* GET create or stop the session. */
 router.get('/api/trigger_session', async function (req, res, next) {
+  if(!req.body.private_key || !req.body.stationID) return res.send({ msg: "Unautherized." })
   // console.log(req.body);
-  check_private_key(req, res, next)
+  let checky = check_private_key(req, res, next)
+  if(!checky) return res.send({ msg: "Please, Make sure the private_key is valid." });
 
   let current_stationID = req.body.stationID || req.headers['stationID'] || req.params.stationID
   if (current_stationID == undefined) res.json({ msg: "Please send the stationID." })
@@ -154,7 +156,10 @@ router.get('/api/trigger_session', async function (req, res, next) {
 
 /* POST add a new cookie. */
 router.get('/api/add_cookie', async function (req, res, next) {
-  check_private_key(req, res, next)
+  if(!req.body.private_key || !req.body.stationID) return res.send({ msg: "Unautherized." })
+  // console.log(req.body);
+  let checky = check_private_key(req, res, next)
+  if(!checky) return res.send({ msg: "Please, Make sure the private_key is valid." });
 
   let current_stationID = req.body.stationID || req.headers['stationID'] || req.params.stationID
   if (current_stationID == undefined) res.json({ msg: "Please send the stationID." })
