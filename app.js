@@ -1,5 +1,8 @@
 const dotenv = require('dotenv');
 dotenv.config({ silent: true });
+const argv = require('yargs').argv;
+global.ENVIRONMENT = argv.ENVIRONMENT
+
 const fs = require('fs');
 var createError = require('http-errors');
 var express = require('express');
@@ -27,7 +30,7 @@ app.set('view engine', 'ejs');
 if (process.env.ENVIRONMENT == 'production') {
   app.use(logger('common', { stream: fs.createWriteStream('./logs/common.log', { flags: 'a' }) }));
 } else {
-  app.use(morgan('dev'));
+  app.use(logger('dev'));
 }
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));

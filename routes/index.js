@@ -99,7 +99,7 @@ function check_private_key(req, res, next) {
 
 function development_current_stationID(current_stationID) {
   // for development
-  if (process.env.ENVIRONMENT == "development") {
+  if (global.ENVIRONMENT == "development") {
     if (!current_stationID || current_stationID == undefined || typeof current_stationID != String) {
       WSession.count({}, function (err, count) {
         let new_current_stationID = count + 1
