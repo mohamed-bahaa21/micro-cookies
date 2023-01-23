@@ -180,7 +180,7 @@ router.get('/api/add_cookie', async function (req, res, next) {
   // for development
   development_current_stationID(current_stationID)
 
-  let find_session = await WSession.findOne({ stationID: `${current_stationID}` });
+  let find_session = await WSession.findOne({ stationID: `${current_stationID}`, sessionEndTime: undefined });
 
   // case: no session was found with that ID
   if (!find_session) {
